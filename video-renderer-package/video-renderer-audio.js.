@@ -1,0 +1,77 @@
+(function(global){“use strict”;
+const DEFAULTS={fps:30,transition:.55};
+const $=id=>document.getElementById(id);
+function project(){if(!global.ScienceStudio||typeof global.ScienceStudio.getCurrentProject!==“function”)throw new Error(“The website project bridge is not connected.”);return global.ScienceStudio.getCurrentProject();}
+function dims(ratio){if(ratio===“9:16”)return {width:720,height:1280};if(ratio===“1:1”)return {width:1080,height:1080};return {width:1280,height:720};}
+function supportedMime(preference){
+if(!global.MediaRecorder)return null;
+const all=[“video/mp4;codecs=h264,aac”,“video/mp4”,“video/webm;codecs=vp9,opus”,“video/webm;codecs=vp8,opus”,“video/webm”];
+const candidates=preference===“mp4”||preference===“video/mp4”?all.filter(t=>t.includes(“mp4”)):preference===“webm”||preference===“video/webm”?all.filter(t=>t.includes(“webm”)):all;
+return candidates.find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||””;
+}
+function ext(mime){return mime&&mime.toLowerCase().includes(“mp4”)?”.mp4”:”.webm”;}
+function loadImage(scene,index){return new Promise((resolve,reject)=>{const src=scene.imageData||scene.imageUrl||scene.image||scene.generatedImage;if(!src)return reject(new Error(“Scene “+(index+1)+” (“”+(scene.title||“Untitled”)+””) has no image. Generate or upload an image before rendering.”));const img=new Image();img.crossOrigin=“anonymous”;img.onload=()=>img.naturalWidth?resolve(img):reject(new Error(“Scene “+(index+1)+” image is empty.”));img.onerror=()=>reject(new Error(“Could not load scene “+(index+1)+” image. Check the image and browser permissions.”));img.src=src;});}
+function waitForMetadata(audio){return new Promise((resolve,reject)=>{if(audio.readyState>=1&&Number.isFinite(audio.duration)&&audio.duration>0)return resolve();const done=()=>{cleanup();Number.isFinite(audio.duration)&&audio.duration>0?resolve():reject(new Error(“The selected audio file has no readable duration. Try a WAV, MP3, or M4A file.”));};const fail=()=>{cleanup();reject(new Error(“This browser cannot decode that audio file. Try WAV, MP3, or M4A.”));};const cleanup=()=>{audio.removeEventListener(“loadedmetadata”,done);audio.removeEventListener(“durationchange”,done);audio.removeEventListener(“error”,fail);};audio.addEventListener(“loadedmetadata”,done);audio.addEventListener(“durationchange”,done);audio.addEventListener(“error”,fail);audio.load();});}
+function sceneTitle(ctx,title,w,h,ratio){if(!title)return;const fs=Math.max(20,Math.round(w*(ratio===“9:16”?.05:.038)));ctx.save();ctx.font=“700 “+fs+“px system-ui,Arial”;ctx.textAlign=“center”;ctx.textBaseline=“top”;const maxW=w*.88,words=String(title).split(/\s+/),lines=[];let line=””;words.forEach(word=>{const test=(line+” “+word).trim();if(ctx.measureText(test).width>maxW&&line){lines.push(line);line=word;}else line=test;});if(line)lines.push(line);const shown=lines.slice(0,2),pad=fs*.45,lh=fs1.2,bh=shown.lengthlh+pad2,bw=Math.min(maxW,Math.max(…shown.map(s=>ctx.measureText(s).width))+pad2),x=(w-bw)/2;ctx.fillStyle=“rgba(4,14,27,.75)”;ctx.fillRect(x,h*.045,bw,bh);ctx.fillStyle=”#fff”;shown.forEach((s,i)=>ctx.fillText(s,w/2,h*.045+pad+ilh,w.86));ctx.restore();}
+async function render(options={}){
+const ui=options.ui||{},update=(p,s)=>{if(ui.progress)ui.progress.value=p;if(ui.progressFill)ui.progressFill.style.width=p+”%”;if(ui.status)ui.status.textContent=s;if(ui.percent)ui.percent.textContent=Math.round(p)+”%”;};
+let recorder,stream,raf=0,videoUrl=null,audioUrl=null,audioContext=null,audioSource=null,audioElement=null;
+try{
+if(!global.MediaRecorder)throw new Error(“This browser does not support video recording. Try a recent desktop Chrome or Edge.”);
+const p=project();if(!p)throw new Error(“Create or open a project first.”);
+const scenes=Array.isArray(p.scenes)?p.scenes:[];if(!scenes.length)throw new Error(“This project has no scenes.”);
+const file=options.audioFile||$(“narrationAudioFile”)?.files?.[0];if(!file)throw new Error(“Choose your narration audio file first. WAV, MP3, and M4A are supported.”);
+if(file.type&&!file.type.startsWith(“audio/”)&&!/.(wav|mp3|m4a|aac|ogg|oga|opus|flac)$/i.test(file.name))throw new Error(“Please choose an audio file, not a video file.”);
+const mime=supportedMime(options.mimePreference||$(“rendererFormat”)?.value);if(!mime)throw new Error(“This browser cannot record the selected output format. Choose Automatic or WebM, or try desktop Chrome.”);
+const AudioContextClass=global.AudioContext||global.webkitAudioContext;if(!AudioContextClass)throw new Error(“This browser cannot mix narration audio into the video. Try a recent browser.”);
+audioUrl=URL.createObjectURL(file);audioElement=new Audio();audioElement.preload=“auto”;audioElement.src=audioUrl;
+audioContext=new AudioContextClass();audioSource=audioContext.createMediaElementSource(audioElement);const audioDestination=audioContext.createMediaStreamDestination();audioSource.connect(audioDestination);
+const resumePromise=audioContext.resume();
+update(2,“Reading narration audio…”);const metadataPromise=waitForMetadata(audioElement);
+const loaded=[];for(let i=0;i<scenes.length;i++){update(4+14i/scenes.length,“Loading scene “+(i+1)+” of “+scenes.length+”…”);loaded.push(await loadImage(scenes[i],i));}
+await metadataPromise;await resumePromise;
+const audioDuration=audioElement.duration;if(!Number.isFinite(audioDuration)||audioDuration<=0)throw new Error(“Could not read the narration duration.”);
+const weights=scenes.map(s=>Math.max(1,Number(s.duration)||5)),weightTotal=weights.reduce((a,b)=>a+b,0),durations=weights.map(v=>audioDurationv/weightTotal);
+const ratioInput=options.ratio||$(“rendererRatio”)?.value||p.aspectRatio||“16:9”;const ratio=[“9:16”,“16:9”,“1:1”].includes(ratioInput)?ratioInput:“16:9”;
+const {width,height}=dims(ratio),canvas=document.createElement(“canvas”);canvas.width=width;canvas.height=height;const ctx=canvas.getContext(“2d”,{alpha:false});if(!ctx)throw new Error(“Canvas drawing is unavailable.”);
+stream=canvas.captureStream(DEFAULTS.fps);audioDestination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5_000_000});const chunks=[];let recorderError=null;
+recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};recorder.onerror=e=>{recorderError=e.error||new Error(“The browser recorder failed.”);};
+const stopped=new Promise((resolve,reject)=>{recorder.onstop=()=>recorderError?reject(recorderError):resolve();});
+audioElement.currentTime=0;await audioElement.play();recorder.start(500);update(20,“Rendering scenes and recording narration…”);
+const total=durations.reduce((a,b)=>a+b,0),transition=Math.min(DEFAULTS.transition,Math.min(…durations)/3);let last=0;
+for(let i=0;i<scenes.length;i++){
+const scene=scenes[i],img=loaded[i],duration=durations[i],start=performance.now();
+const camera=String(scene.camera||””).toLowerCase(),motion=camera.includes(“left”)?“panLeft”:camera.includes(“right”)?“panRight”:camera.includes(“up”)?“panUp”:camera.includes(“down”)?“panDown”:camera.includes(“out”)?“zoomOut”:“cinematic”;
+const narration=String(scene.narration||scene.caption||scene.onScreen||””).trim();
+await new Promise(resolve=>{
+const frame=now=>{
+const t=Math.min(1,(now-start)/(duration1000));ctx.fillStyle=”#07111f”;ctx.fillRect(0,0,width,height);
+const fadeIn=i===0?1:Math.min(1,(now-start)/(transition1000)),fadeOut=i===scenes.length-1?1:Math.min(1,(duration1000-(now-start))/(transition1000)),alpha=Math.max(0,Math.min(fadeIn,fadeOut));
+if(global.ScienceStudioAnimation&&global.ScienceStudioAnimation.draw)global.ScienceStudioAnimation.draw(ctx,img,width,height,motion,t,alpha);else{ctx.globalAlpha=alpha;ctx.drawImage(img,0,0,width,height);ctx.globalAlpha=1;}
+sceneTitle(ctx,scene.title,width,height,ratio);
+if(narration&&global.ScienceStudioSubtitles){const subs=global.ScienceStudioSubtitles.segments(narration,duration),local=(now-start)/1000,seg=subs.find(x=>local>=x.start&&local<x.end)||subs[subs.length-1];if(seg&&seg.text)global.ScienceStudioSubtitles.draw(ctx,seg.text,width,height,ratio);}
+const elapsed=durations.slice(0,i).reduce((a,b)=>a+b,0)+tduration;const progress=20+78(elapsed/total);if(progress-last>=.35||t===1){last=progress;update(progress,“Rendering scene “+(i+1)+” of “+scenes.length+”…”);}
+if(t<1&&audioElement.currentTime<audioDuration+.15)requestAnimationFrame(frame);else resolve();
+};requestAnimationFrame(frame);
+});
+}
+if(recorder.state!==“inactive”)recorder.stop();await stopped;
+const blob=new Blob(chunks,{type:recorder.mimeType||mime});if(!blob.size)throw new Error(“The browser returned an empty video. Try a shorter project or another browser.”);
+videoUrl=URL.createObjectURL(blob);const filename=(String(p.title||p.name||“science-video”).toLowerCase().replace(/[^a-z0-9]+/g,”-”).replace(/^-|-$/g,””)||“science-video”)+ext(blob.type||mime);
+if(ui.preview){ui.preview.src=videoUrl;ui.preview.hidden=false;ui.preview.style.display=“block”;ui.preview.load();}
+if(ui.download){ui.download.href=videoUrl;ui.download.download=filename;ui.download.hidden=false;ui.download.style.display=“inline-block”;}
+update(100,“Video ready: “+filename+”. Narration audio is embedded. Output: “+(ext(blob.type||mime)===”.mp4”?“MP4”:“WebM”)+”.”);
+return {blob,url:videoUrl,filename,mime:blob.type||mime,hasNarrationAudio:true};
+}catch(error){if(recorder&&recorder.state!==“inactive”){try{recorder.stop();}catch{}}if(videoUrl)URL.revokeObjectURL(videoUrl);update(0,“Rendering failed: “+(error.message||String(error)));throw error;
+}finally{if(stream)stream.getTracks().forEach(t=>t.stop());if(audioElement){audioElement.pause();audioElement.src=””;}if(audioSource){try{audioSource.disconnect();}catch{}}if(audioContext){try{await audioContext.close();}catch{}}if(audioUrl)URL.revokeObjectURL(audioUrl);}
+}
+function connect(options={}){
+const ui={progress:null,progressFill:$(“rendererProgressFill”),status:$(“rendererStatus”),percent:$(“rendererPercent”),preview:$(“rendererPreview”),download:$(“rendererDownload”),…(options.ui||{})};
+const button=$(options.buttonId||“renderVideoButton”);if(!button)return false;if(button.dataset.rendererBound===“1”)return true;button.dataset.rendererBound=“1”;
+button.addEventListener(“click”,async()=>{button.disabled=true;if(ui.download){ui.download.hidden=true;ui.download.style.display=“none”;}try{await render({mimePreference:$(“rendererFormat”)?.value,audioFile:$(“narrationAudioFile”)?.files?.[0],ratio:$(“rendererRatio”)?.value,ui});}catch(e){/* status displays the error */}finally{button.disabled=false;}});
+return true;
+}
+global.ScienceStudioVideoRenderer={render,connect,supportedMime,dimensions:dims};
+if(document.readyState===“loading”)document.addEventListener(“DOMContentLoaded”,()=>connect());else connect();
+})(window);
