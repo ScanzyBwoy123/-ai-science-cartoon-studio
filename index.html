@@ -17,7 +17,46 @@
 <section id="v-editor" class="view hidden"><div class="sectionhead"><div><h2 id="editorTitle">Scene editor</h2><span class="muted" id="editorMeta">Create or open a project.</span></div><div class="inline"><button id="save">Save</button><button id="addScene">＋ Add scene</button></div></div><div class="note">Scene thumbnails are placeholders until you upload images. This version does not generate AI images or video clips.</div><div class="card"><div class="field"><label>Full narration script · editable</label><textarea id="script" placeholder="Your script appears here…"></textarea></div><div class="actions"><button id="applyScript">Apply script to first scene</button><button id="exportScript">Export script TXT</button><button id="exportBoard">Export storyboard Markdown</button><button id="exportSrt">Export subtitle draft SRT</button><button id="exportJson">Export project JSON</button></div></div><div class="sectionhead"><h2>Storyboard scenes</h2><span class="muted" id="sceneCount">0 scenes</span></div><div id="scenes"></div></section>
 <section id="v-research" class="view hidden"><div class="card"><h2>Research sources</h2><p class="muted">No automatic web search in this release. Add reliable source links and the claims they support; open and verify every source.</p><div class="field"><label>Source title</label><input id="sourceTitle" placeholder="e.g. Heart and circulation"></div><div class="field" style="margin-top:10px"><label>Source URL</label><input id="sourceUrl" type="url" placeholder="https://…"></div><div class="field" style="margin-top:10px"><label>Claim or note</label><textarea id="sourceNote" placeholder="Which scientific claim does this support?"></textarea></div><div class="actions"><button class="primary" id="addSource">Add source</button></div><div class="sectionhead"><h2>Current project sources</h2></div><div id="sourceList"></div><div class="note">Good starting points include WHO, CDC, NIH / MedlinePlus, NASA, OpenStax and university research pages. Do not label content verified unless claims have actually been checked.</div></div></section>
 <section id="v-audio" class="view hidden"><div class="card"><h2>Audio & narration</h2><p>Use browser speech synthesis to preview narration if your device supports it. This is playback only, not a downloadable audio file.</p><div class="field"><label>Available browser voice</label><select id="voice"></select></div><div class="field" style="margin-top:12px"><label>Speaking speed: <span id="rateText">1.0×</span></label><input id="rate" type="range" min=".7" max="1.3" step=".1" value="1"></div><div class="actions"><button class="primary" id="play">▶ Preview narration</button><button id="stop">■ Stop</button></div><p id="speechStatus" class="muted"></p><div class="note">Audio download and automatic narration synchronization are not implemented.</div></div></section>
-<section id="v-renderer" class="view hidden"><div class="card"><h2>Video renderer</h2><div class="note">MP4 rendering is not configured. No video has been rendered.</div><p class="muted">A future renderer needs image/audio assets, a backend worker (for example FFmpeg), timing and job-progress reporting. Static hosting alone is not a reliable long-video renderer.</p><h3>Project readiness</h3><div id="readiness"></div><div class="progress"><div id="bar" style="width:0"></div></div><div class="actions"><button id="check">Check readiness</button></div></div></section>
+<section id="v-renderer" class="view hidden">
+  <div class="card">
+    <h2>🎬 AI Science Cartoon Video Renderer</h2>
+    <p class="muted">Turn your science storyboard into a narrated-style cartoon video with scene images and subtitles.</p>
+<div class="note">
+  <strong>Before rendering:</strong> Open a project and make sure your scenes have images and suitable durations. Video and audio support depends on your browser.
+</div>
+<h3>Current project</h3>
+<p id="rendererProjectTitle">No project selected</p>
+<label for="rendererFormat">Video format</label>
+<select id="rendererFormat">
+  <option value="auto">Automatic (recommended)</option>
+  <option value="video/mp4">MP4 (if supported by your browser)</option>
+  <option value="video/webm">WebM</option>
+</select>
+<div class="actions">
+  <button id="renderVideoButton">🎥 Render Video</button>
+</div>
+<div id="rendererProgress" class="muted" aria-live="polite">Waiting to render.</div>
+<div class="progress">
+  <div id="rendererProgressFill" style="width:0%"></div>
+</div>
+<p id="rendererPercent">0%</p>
+<p id="rendererStatus" class="muted">Open a project to begin.</p>
+<div id="rendererError" class="note hidden"></div>
+<video id="rendererPreview" controls playsinline style="width:100%;max-height:480px;display:none"></video>
+<div class="actions">
+  <a id="rendererDownload" class="button" style="display:none" download="science-cartoon-video.webm">Download Video</a>
+</div>
+<hr>
+<h3>Project readiness</h3>
+<div id="readiness"></div>
+<div class="progress">
+  <div id="bar" style="width:0"></div>
+</div>
+<div class="actions">
+  <button id="check">Check readiness</button>
+</div>
+  </div>
+</section>
 <section id="v-settings" class="view hidden"><div class="card"><h2>Settings & help</h2><h3>Working now</h3><p>Project creation, template-based starter script, editable storyboard, local saving, source notes, browser narration preview, TXT/Markdown/SRT/JSON exports.</p><h3>Not yet integrated</h3><p>Live web research, LLM script generation, AI image generation, downloadable TTS audio, genuine animation, cloud sync, accounts and MP4 rendering.</p><div class="note">Never put private API keys in frontend JavaScript or public GitHub files. Use server-side API routes / Workers and environment secrets.</div><h3>Local storage</h3><p id="storageInfo" class="muted"></p><div class="actions"><button id="backup">Download all-project backup</button><button id="clear" style="color:#ffb2bb">Delete all local projects</button></div><div class="sectionhead"><h2>Suggested next phase</h2></div><ol><li>Connect server-side research and script APIs.</li><li>Add image generation with prompt approval.</li><li>Store assets in object storage.</li><li>Build a background renderer with progress tracking.</li></ol></div></section>
 <div class="footer">AI Science Cartoon Studio · Phase 1 foundation · Scientific review required · Local-first demo</div></main></div><div id="toast" class="toast hidden" role="status"></div>
 <script>(()=>{'use strict';
@@ -347,6 +386,41 @@ window.ScienceStudio.getCurrentProject = function () {
 const project = cur();
 if (!project) return null;
 return JSON.parse(JSON.stringify(project));
-};              
+};
 })();
-</script></body></html>
+<script src="video-renderer-package/animation.js"></script>
+<script src="video-renderer-package/subtitles.js"></script>
+<script src="video-renderer-package/narration.js"></script>
+<script src="video-renderer-package/video-renderer.js"></script>
+<script>
+(function () {
+  const title = document.getElementById("rendererProjectTitle");
+  const button = document.getElementById("renderVideoButton");
+  const status = document.getElementById("rendererStatus");
+  function refreshTitle() {
+    const project = window.ScienceStudio &&
+      window.ScienceStudio.getCurrentProject();
+    if (title) {
+      title.textContent = project
+        ? (project.title || project.name || project.topic || "Untitled project")
+        : "No project selected";
+    }
+  }
+  refreshTitle();
+  document.querySelectorAll('[data-view="renderer"], [data-go="renderer"]').forEach(function (element) {
+    element.addEventListener("click", refreshTitle);
+  });
+  if (window.ScienceStudioVideoRenderer &&
+      typeof window.ScienceStudioVideoRenderer.connect === "function") {
+    window.ScienceStudioVideoRenderer.connect();
+  } else {
+    if (button) button.disabled = true;
+    if (status) {
+      status.textContent =
+        "Renderer scripts did not load. Check the video-renderer-package files.";
+    }
+  }
+})();
+</script>
+</body>
+</html>
