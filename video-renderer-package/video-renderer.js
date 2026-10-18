@@ -35,7 +35,7 @@
       const p=project();if(!p)throw new Error("Create or open a project first.");
       const scenes=Array.isArray(p.scenes)?p.scenes:[];
       if(!scenes.length)throw new Error("This project has no scenes.");
-      const ratio=options.ratio||p.format||p.aspectRatio||"16:9";if(!["9:16","16:9","1:1"].includes(ratio))throw new Error("Unsupported aspect ratio: "+ratio);
+      const requestedRatio=options.ratio||p.format||p.aspectRatio||"16:9";const ratio=["9:16","16:9","1:1"].includes(requestedRatio)?requestedRatio:"16:9";
       update(2,"Checking browser recording support…");
       const mime=supportedMime();if(!mime)throw new Error("This browser does not report support for MP4 or WebM MediaRecorder output. No video was created.");
       const loaded=[];
