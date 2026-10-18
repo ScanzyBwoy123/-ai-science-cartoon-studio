@@ -32,6 +32,17 @@
   <option value="video/mp4">MP4 (if supported by your browser)</option>
   <option value="video/webm">WebM</option>
 </select>
+   <div class="field">
+  <label for="narrationAudioFile">Upload narration audio</label>
+  <input
+    type="file"
+    id="narrationAudioFile"
+    accept="audio/*"
+  >
+  <p class="muted">
+    Select the narration audio file to include in your exported video.
+  </p>
+</div> 
 <div class="actions">
   <button id="renderVideoButton">🎥 Render Video</button>
 </div>
@@ -422,6 +433,5 @@ return JSON.parse(JSON.stringify(project));
     }
   }
 })();
-</script>
 </body>
 </html>
