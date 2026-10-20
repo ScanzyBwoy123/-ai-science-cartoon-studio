@@ -29,8 +29,8 @@
 <label for="rendererFormat">Video format</label>
 <select id="rendererFormat">
   <option value="auto">Automatic (recommended)</option>
-  <option value="video/mp4">MP4 (if supported by your browser)</option>
-  <option value="video/webm">WebM</option>
+  <option value="mp4">MP4 (if supported by your browser)</option>
+  <option value="webm">WebM</option>
 </select>
    <div class="field">
   <label for="narrationAudioFile">Upload narration audio</label>
@@ -400,10 +400,17 @@ return JSON.parse(JSON.stringify(project));
 };
 })();
 </script>
+  <!-- Cartoon animation -->
 <script src="video-renderer-package/animation.js"></script>
+
+<!-- Subtitle rendering -->
 <script src="video-renderer-package/subtitles.js"></script>
+
+<!-- Narration utilities -->
 <script src="video-renderer-package/narration.js"></script>
-<script src="video-renderer-package/video-renderer-audio.js"></script>
+
+<!-- Main video renderer: load AFTER its dependencies -->
+<script src="video-renderer-package/video-renderer.js"></script>
 <script>
 (function () {
   const title = document.getElementById("rendererProjectTitle");
