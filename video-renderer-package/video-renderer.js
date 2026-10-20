@@ -66,7 +66,50 @@
       image.src = source;
     });
   }
+const NARRATION_API =
+  "https://ai-science-cartoon-studio-api.ddangote701.workers.dev";
 
+async function generateNarrationAudio(text, audioContext, voice) {
+  if (!text || !text.trim()) {
+    return null;
+  }
+
+  const response = await fetch(NARRATION_API + "/narrate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text: text.trim(),
+      voice: voice || "Kore"
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || "The AI voice could not be generated."
+    );
+  }
+
+  if (!data.audioBase64) {
+    throw new Error(
+      "The AI voice service returned no audio."
+    );
+  }
+
+  const binary = atob(data.audioBase64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return await audioContext.decodeAudioData(
+    bytes.buffer
+  );
+}
   function wrapText(ctx, text, maxWidth, maxLines) {
     const words = String(text || "").trim().split(/\s+/).filter(Boolean);
     const lines = [];
