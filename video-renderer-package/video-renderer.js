@@ -288,8 +288,20 @@ audioDestination.stream
         recorder.onstop = () => recorderError ? reject(recorderError) : resolve();
       });
 
-      const durations = scenes.map(scene =>
-        Math.max(1, Math.min(60, Number(scene.duration) || 5)));
+      const durations = scenes.map((scene, index) =>
+  Math.max(
+    1,
+    Math.min(
+      60,
+      Math.max(
+        Number(scene.duration) || 5,
+        narrationAudios[index]
+          ? narrationAudios[index].duration + 0.5
+          : 0
+      )
+    )
+  )
+);
       const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
       const transition = Math.min(DEFAULTS.transition, Math.min.apply(null, durations) / 3);
       let elapsedBeforeScene = 0;
