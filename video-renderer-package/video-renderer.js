@@ -181,7 +181,7 @@ async function generateNarrationAudio(text, audioContext, voice) {
       }
     };
 
-    let recorder = null;
+    let audioContext = null;
     let stream = null;
     let animationFrame = 0;
     let outputUrl = null;
@@ -240,7 +240,7 @@ if (!AudioContextClass) {
     "Audio recording is not supported by this browser."
   );
 }
-const audioContext = new AudioContextClass();
+audioContext = new AudioContextClass();
 await audioContext.resume();
 const audioDestination =
   audioContext.createMediaStreamDestination();
@@ -416,8 +416,18 @@ if (narrationAudio) {
       }
       throw error;
     } finally {
-      if (stream) stream.getTracks().forEach(track => track.stop());
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  if (audioContext && audioContext.state !== "closed") {
+    try {
+      await audioContext.close();
+    } catch (error) {
+      console.warn("Audio cleanup failed:", error);
     }
+  }
+}
   }
 
   function connect(options) {
