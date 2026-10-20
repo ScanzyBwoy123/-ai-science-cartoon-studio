@@ -233,7 +233,46 @@ async function generateNarrationAudio(text, audioContext, voice) {
         throw new Error("This browser does not support canvas video capture.");
       }
 
-      stream = canvas.captureStream(DEFAULTS.fps);
+      const AudioContextClass =
+  global.AudioContext || global.webkitAudioContext;
+if (!AudioContextClass) {
+  throw new Error(
+    "Audio recording is not supported by this browser."
+  );
+}
+const audioContext = new AudioContextClass();
+await audioContext.resume();
+const audioDestination =
+  audioContext.createMediaStreamDestination();
+const narrationAudios = [];
+update(17, "Generating AI narration...");
+for (let i = 0; i < scenes.length; i++) {
+  const scene = scenes[i];
+  const narration = String(
+    scene.narration ||
+    scene.caption ||
+    scene.onScreen ||
+    ""
+  ).trim();
+  if (!narration) {
+    narrationAudios.push(null);
+    continue;
+  }
+  update(
+    17 + (2 * i / scenes.length),
+    "Generating voice for scene " +
+      (i + 1) + " of " + scenes.length + "..."
+  );
+  const audio = await generateNarrationAudio(
+    narration,
+    audioContext
+  );
+  narrationAudios.push(audio);
+}
+stream = canvas.captureStream(DEFAULTS.fps);
+audioDestination.stream
+  .getAudioTracks()
+  .forEach(track => stream.addTrack(track));
       recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 });
       const chunks = [];
       let recorderError = null;
