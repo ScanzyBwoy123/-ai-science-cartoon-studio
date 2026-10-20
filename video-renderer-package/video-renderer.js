@@ -479,7 +479,6 @@ if (narrationAudio) {
         ui.preview.hidden = true;
         ui.preview.style.display = "none";
       }
-      try {
        try {
 // Activate audio immediately during the user’s tap.
 const AudioContextClass =
