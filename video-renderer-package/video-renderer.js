@@ -480,12 +480,25 @@ if (narrationAudio) {
         ui.preview.style.display = "none";
       }
       try {
-        await render({
-          ratio: $(options.ratioId || "rendererRatio")?.value || "16:9",
-          outputFormat: $(options.formatId || "rendererFormat")?.value || "auto",
-          ui
-        });
-      } catch (_) {
+       try {
+// Activate audio immediately during the user’s tap.
+const AudioContextClass =
+global.AudioContext || global.webkitAudioContext;
+const audioContext = AudioContextClass
+? new AudioContextClass()
+: null;
+const audioResumePromise = audioContext
+? audioContext.resume()
+: null;
+
+await render({
+ratio: $(options.ratioId || “rendererRatio”)?.value || “16:9”,
+outputFormat: $(options.formatId || “rendererFormat”)?.value || “auto”,
+audioContext,
+audioResumePromise,
+ui
+});
+} catch (_) {
         // A helpful error message is displayed in the renderer panel.
       } finally {
         button.disabled = false;
