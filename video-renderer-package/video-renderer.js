@@ -302,6 +302,19 @@ audioDestination.stream
         const scene = scenes[i];
         const image = images[i];
         const duration = durations[i];
+        let narrationSource = null;
+
+const narrationAudio = narrationAudios[i];
+
+if (narrationAudio) {
+  narrationSource = audioContext.createBufferSource();
+
+  narrationSource.buffer = narrationAudio;
+
+  narrationSource.connect(audioDestination);
+
+  narrationSource.start();
+}
         const start = performance.now();
         const narration = String(scene.narration || scene.caption || scene.onScreen || "").trim();
         const subtitleSegments = global.ScienceStudioSubtitles
