@@ -306,7 +306,22 @@ audioDestination.stream
       const transition = Math.min(DEFAULTS.transition, Math.min.apply(null, durations) / 3);
       let elapsedBeforeScene = 0;
       let lastProgress = 0;
+// Keep the audio engine active on iPhone Safari.
+await audioContext.resume();
 
+if (audioContext.state !== "running") {
+  throw new Error(
+    "The audio engine is paused. Please tap Generate Video again."
+  );
+}
+
+if (!audioDestination.stream.getAudioTracks().some(
+  track => track.readyState === "live"
+)) {
+  throw new Error(
+    "The narration audio track is not available for recording."
+  );
+}
       recorder.start(1000);
       update(20, "Rendering video frames…");
 
