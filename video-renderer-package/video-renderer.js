@@ -181,7 +181,7 @@ async function generateNarrationAudio(text, audioContext, voice) {
       }
     };
 
-    let audioContext = null;
+let audioContext = options.audioContext || null;
 let stream = null;
 let recorder = null;
 let animationFrame = 0;
