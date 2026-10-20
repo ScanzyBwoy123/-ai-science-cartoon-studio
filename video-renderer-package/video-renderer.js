@@ -66,7 +66,50 @@
       image.src = source;
     });
   }
+const NARRATION_API =
+  "https://ai-science-cartoon-studio-api.ddangote701.workers.dev";
 
+async function generateNarrationAudio(text, audioContext, voice) {
+  if (!text || !text.trim()) {
+    return null;
+  }
+
+  const response = await fetch(NARRATION_API + "/narrate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text: text.trim(),
+      voice: voice || "Kore"
+    })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || "The AI voice could not be generated."
+    );
+  }
+
+  if (!data.audioBase64) {
+    throw new Error(
+      "The AI voice service returned no audio."
+    );
+  }
+
+  const binary = atob(data.audioBase64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return await audioContext.decodeAudioData(
+    bytes.buffer
+  );
+}
   function wrapText(ctx, text, maxWidth, maxLines) {
     const words = String(text || "").trim().split(/\s+/).filter(Boolean);
     const lines = [];
@@ -138,11 +181,11 @@
       }
     };
 
-    let recorder = null;
-    let stream = null;
-    let animationFrame = 0;
-    let outputUrl = null;
-
+let audioContext = options.audioContext || null;
+let stream = null;
+let recorder = null;
+let animationFrame = 0;
+let outputUrl = null;
     try {
       if (!global.MediaRecorder) {
         throw new Error("This browser does not support video recording. Try a recent version of desktop Chrome or Edge.");
@@ -190,7 +233,48 @@
         throw new Error("This browser does not support canvas video capture.");
       }
 
-      stream = canvas.captureStream(DEFAULTS.fps);
+      const AudioContextClass =
+  global.AudioContext || global.webkitAudioContext;
+if (!AudioContextClass) {
+  throw new Error(
+    "Audio recording is not supported by this browser."
+  );
+}
+if (!audioContext) {
+audioContext = new AudioContextClass();
+}
+await (options.audioResumePromise || audioContext.resume());
+const audioDestination =
+  audioContext.createMediaStreamDestination();
+const narrationAudios = [];
+update(17, "Generating AI narration...");
+for (let i = 0; i < scenes.length; i++) {
+  const scene = scenes[i];
+  const narration = String(
+    scene.narration ||
+    scene.caption ||
+    scene.onScreen ||
+    ""
+  ).trim();
+  if (!narration) {
+    narrationAudios.push(null);
+    continue;
+  }
+  update(
+    17 + (2 * i / scenes.length),
+    "Generating voice for scene " +
+      (i + 1) + " of " + scenes.length + "..."
+  );
+  const audio = await generateNarrationAudio(
+    narration,
+    audioContext
+  );
+  narrationAudios.push(audio);
+}
+stream = canvas.captureStream(DEFAULTS.fps);
+audioDestination.stream
+  .getAudioTracks()
+  .forEach(track => stream.addTrack(track));
       recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 });
       const chunks = [];
       let recorderError = null;
@@ -206,13 +290,40 @@
         recorder.onstop = () => recorderError ? reject(recorderError) : resolve();
       });
 
-      const durations = scenes.map(scene =>
-        Math.max(1, Math.min(60, Number(scene.duration) || 5)));
+      const durations = scenes.map((scene, index) =>
+  Math.max(
+    1,
+    Math.min(
+      60,
+      Math.max(
+        Number(scene.duration) || 5,
+        narrationAudios[index]
+          ? narrationAudios[index].duration + 0.5
+          : 0
+      )
+    )
+  )
+);
       const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
       const transition = Math.min(DEFAULTS.transition, Math.min.apply(null, durations) / 3);
       let elapsedBeforeScene = 0;
       let lastProgress = 0;
+// Keep the audio engine active on iPhone Safari.
+await audioContext.resume();
 
+if (audioContext.state !== "running") {
+  throw new Error(
+    "The audio engine is paused. Please tap Generate Video again."
+  );
+}
+
+if (!audioDestination.stream.getAudioTracks().some(
+  track => track.readyState === "live"
+)) {
+  throw new Error(
+    "The narration audio track is not available for recording."
+  );
+}
       recorder.start(1000);
       update(20, "Rendering video frames…");
 
@@ -220,6 +331,19 @@
         const scene = scenes[i];
         const image = images[i];
         const duration = durations[i];
+        let narrationSource = null;
+
+const narrationAudio = narrationAudios[i];
+
+if (narrationAudio) {
+  narrationSource = audioContext.createBufferSource();
+
+  narrationSource.buffer = narrationAudio;
+
+  narrationSource.connect(audioDestination);
+
+  narrationSource.start();
+}
         const start = performance.now();
         const narration = String(scene.narration || scene.caption || scene.onScreen || "").trim();
         const subtitleSegments = global.ScienceStudioSubtitles
@@ -286,13 +410,13 @@
         ui.download.hidden = false;
       }
 
-      update(100, "Video ready: " + filename + ". Spoken narration audio is not included in this render.");
+      update(100, "Video ready: " + filename + ". AI narration is included.");
       return {
         blob,
         url: outputUrl,
         filename,
         mime: blob.type || mime,
-        hasNarrationAudio: false
+        hasNarrationAudio: narrationAudios.some(Boolean)
       };
     } catch (error) {
       cancelAnimationFrame(animationFrame);
@@ -309,8 +433,18 @@
       }
       throw error;
     } finally {
-      if (stream) stream.getTracks().forEach(track => track.stop());
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+
+  if (audioContext && audioContext.state !== "closed") {
+    try {
+      await audioContext.close();
+    } catch (error) {
+      console.warn("Audio cleanup failed:", error);
     }
+  }
+}
   }
 
   function connect(options) {
@@ -345,13 +479,25 @@
         ui.preview.hidden = true;
         ui.preview.style.display = "none";
       }
-      try {
-        await render({
-          ratio: $(options.ratioId || "rendererRatio")?.value || "16:9",
-          outputFormat: $(options.formatId || "rendererFormat")?.value || "auto",
-          ui
-        });
-      } catch (_) {
+       try {
+// Activate audio immediately during the user’s tap.
+const AudioContextClass =
+global.AudioContext || global.webkitAudioContext;
+const audioContext = AudioContextClass
+? new AudioContextClass()
+: null;
+const audioResumePromise = audioContext
+? audioContext.resume()
+: null;
+
+await render({
+ratio: $(options.ratioId || "rendererRatio")?.value || "16:9",
+outputFormat: $(options.formatId || "rendererFormat")?.value || "auto",
+audioContext,
+audioResumePromise,
+ui
+});
+} catch (_) {
         // A helpful error message is displayed in the renderer panel.
       } finally {
         button.disabled = false;
