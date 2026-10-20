@@ -393,7 +393,7 @@ if (narrationAudio) {
         ui.download.hidden = false;
       }
 
-      update(100, "Video ready: " + filename + ". Spoken narration audio is not included in this render.");
+      update(100, "Video ready: " + filename + ". AI narration is included.");
       return {
         blob,
         url: outputUrl,
