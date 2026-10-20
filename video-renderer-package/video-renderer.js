@@ -399,7 +399,7 @@ if (narrationAudio) {
         url: outputUrl,
         filename,
         mime: blob.type || mime,
-        hasNarrationAudio: false
+        hasNarrationAudio: narrationAudios.some(Boolean)
       };
     } catch (error) {
       cancelAnimationFrame(animationFrame);
