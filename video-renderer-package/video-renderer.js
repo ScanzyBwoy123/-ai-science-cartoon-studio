@@ -182,11 +182,10 @@ async function generateNarrationAudio(text, audioContext, voice) {
     };
 
     let audioContext = null;
-    let stream = null;
-    let recorder = null;
-    let animationFrame = 0;
-    let outputUrl = null;
-
+let stream = null;
+let recorder = null;
+let animationFrame = 0;
+let outputUrl = null;
     try {
       if (!global.MediaRecorder) {
         throw new Error("This browser does not support video recording. Try a recent version of desktop Chrome or Edge.");
