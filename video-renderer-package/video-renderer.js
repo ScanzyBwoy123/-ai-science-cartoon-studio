@@ -240,8 +240,10 @@ if (!AudioContextClass) {
     "Audio recording is not supported by this browser."
   );
 }
+if (!audioContext) {
 audioContext = new AudioContextClass();
-await audioContext.resume();
+}
+await (options.audioResumePromise || audioContext.resume());
 const audioDestination =
   audioContext.createMediaStreamDestination();
 const narrationAudios = [];
