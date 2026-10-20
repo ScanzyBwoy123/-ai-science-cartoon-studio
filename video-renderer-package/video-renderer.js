@@ -491,8 +491,8 @@ const audioResumePromise = audioContext
 : null;
 
 await render({
-ratio: $(options.ratioId || “rendererRatio”)?.value || “16:9”,
-outputFormat: $(options.formatId || “rendererFormat”)?.value || “auto”,
+ratio: $(options.ratioId || "rendererRatio")?.value || "16:9",
+outputFormat: $(options.formatId || "rendererFormat")?.value || "auto",
 audioContext,
 audioResumePromise,
 ui
