@@ -67,7 +67,7 @@
     });
   }
 const NARRATION_API =
-  "https://ai-science-cartoon-studio-api.ddangote701.workers.dev";
+  "https://ai-science-cartoon-studio-narration-preview.ddangote701.workers.dev";
 
 async function generateNarrationAudio(text, audioContext, voice) {
   if (!text || !text.trim()) {
