@@ -398,6 +398,74 @@ const project = cur();
 if (!project) return null;
 return JSON.parse(JSON.stringify(project));
 };
+window.ScienceStudio.importLessonPlan = function (plan) {
+  if (!plan || !Array.isArray(plan.scenes) || !plan.scenes.length) {
+    throw new Error("The lesson plan has no scenes to import.");
+  }
+
+  const topic = String(plan.topic || "Science lesson").trim();
+  const totalSeconds = Math.max(1, Number(plan.target_duration_seconds) || 60);
+
+  const importedScenes = plan.scenes.map((scene, index) => {
+    const narration = String(
+      scene.teaching_point || scene.narration || ""
+    ).trim();
+
+    return {
+      id: id(),
+      title: "Scene " + (index + 1) + ": " + topic,
+      duration: Math.max(1, Number(scene.target_seconds) || 12),
+      narration: narration,
+      visual: "Educational cartoon showing: " + narration,
+      prompt: "3D educational science cartoon. Topic: " + topic +
+        ". Teaching point: " + narration +
+        ". Scientifically accurate details and clear composition.",
+      camera: "Slow zoom in",
+      onScreen: narration,
+      icon: ["🔬", "🧬", "💡", "🌍"][index % 4],
+      caption: narration,
+      imageData: ""
+    };
+  });
+
+  const project = {
+    id: id(),
+    title: topic,
+    topic: topic,
+    category: "General Science",
+    audience: "General audience",
+    level: "Beginner",
+    duration: totalSeconds,
+    language: "English",
+    style: "3D science cartoon + diagrams",
+    format: ["16:9", "9:16", "1:1"].includes(plan.video_format)
+      ? plan.video_format : "16:9",
+    platform: "YouTube",
+    tone: "Curious and friendly",
+    script: importedScenes.map(s => s.narration).join("\n\n"),
+    scenes: importedScenes,
+    sources: [],
+    createdAt: stamp(),
+    updatedAt: stamp(),
+    status: "Draft",
+    demo: true,
+    importedFrom: "AI Cartoon Teacher Studio"
+  };
+
+  projects.unshift(project);
+  currentId = project.id;
+
+  if (!saveAll()) {
+    projects = projects.filter(item => item.id !== project.id);
+    currentId = null;
+    throw new Error("Browser storage is full. Export a backup and try again.");
+  }
+
+  go("editor");
+  toast("Lesson imported. Generate an image for each scene before rendering.");
+
+  return project.id;
+};              
 })();
 </script>
   <!-- Cartoon animation -->
