@@ -89,6 +89,9 @@
       <textarea id="aiTeacherScript" placeholder="Paste or write the lesson script here. The script should be reviewed for accuracy before video generation."></textarea>
       <div class="muted" id="aiTeacherWordGuide">Suggested narration: about 390 words for a 3-minute lesson.</div>
       <button type="button" class="action" id="aiTeacherPlan">Create scene plan</button>
+      <button type="button" class="action" id="aiTeacherImport" disabled>
+       Send to Science Studio
+      </button>
       <button type="button" class="action secondary" id="aiTeacherExport">Export lesson plan</button>
       <div class="status" id="aiTeacherStatus" role="status"></div>
       <pre id="aiTeacherScenePlan" style="white-space:pre-wrap;color:#dbeafe;font-size:12px"></pre>
@@ -140,7 +143,30 @@
       $("aiTeacherScenePlan").textContent = JSON.stringify(plan, null, 2);
       $("aiTeacherStatus").textContent = "Scene plan created. Review the timing and teaching points.";
       state.plan = plan;
+       $("aiTeacherImport").disabled = false;
     });
+     $("aiTeacherImport").addEventListener("click", () => {
+  if (!state.plan) {
+    $("aiTeacherStatus").textContent = "Create a scene plan first.";
+    return;
+  }
+
+  if (!window.ScienceStudio ||
+      typeof window.ScienceStudio.importLessonPlan !== "function") {
+    $("aiTeacherStatus").textContent =
+      "Science Studio import connection is unavailable.";
+    return;
+  }
+
+  try {
+    window.ScienceStudio.importLessonPlan(state.plan);
+    $("aiTeacherStatus").textContent =
+      "Lesson successfully sent to Science Studio!";
+  } catch (error) {
+    $("aiTeacherStatus").textContent =
+      error.message || "Could not import the lesson.";
+  }
+});
     $("aiTeacherExport").addEventListener("click", () => {
       if (!state.plan) { $("aiTeacherStatus").textContent = "Create a scene plan first."; return; }
       const blob = new Blob([JSON.stringify(state.plan, null, 2)], { type: "application/json" });
